@@ -1,9 +1,12 @@
 from environs import Env
 import logging
 import redis
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from telegram.ext import Filters, Updater
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
+
+from strapi_fetcher import fetch_products, get_product_by_id
 
 _database = None
 
@@ -16,14 +19,38 @@ logger = logging.getLogger(__name__)
 
 
 def start(update, context):
-    update.message.reply_text(text='Привет!')
-    return "ECHO"
+    products = fetch_products()['data']
+    keyboard = [
+        [InlineKeyboardButton(
+            product['attributes']['Title'],
+            callback_data=product['id'])]
+        for product in products
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text(text='Привет!', reply_markup=reply_markup)
+    return "HANDLE_MENU"
 
 
 def echo(update, context):
-    users_reply = update.message.text
-    update.message.reply_text(users_reply)
+    if update.message:
+        user_reply = update.message.text
+        update.message.reply_text(user_reply)
+    else:
+        pass
     return "ECHO"
+
+
+def handle_menu(update, context):
+    query = update.callback_query
+    chat_id = query.message.chat_id
+    query.answer()
+    product_id = query.data
+    product, image = get_product_by_id(product_id)
+    caption = product['data']['attributes']['Description']
+    context.bot.send_photo(chat_id, photo=image, caption=caption)
+    context.bot.delete_message(chat_id, message_id=query.message.message_id)
+
+    return "START"
 
 
 def handle_users_reply(update, context):
@@ -43,7 +70,8 @@ def handle_users_reply(update, context):
 
     states_functions = {
         'START': start,
-        'ECHO': echo
+        'ECHO': echo,
+        'HANDLE_MENU': handle_menu,
     }
     state_handler = states_functions[user_state]
     try:
