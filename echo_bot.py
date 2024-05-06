@@ -47,10 +47,48 @@ def handle_menu(update, context):
     product_id = query.data
     product, image = get_product_by_id(product_id)
     caption = product['data']['attributes']['Description']
-    context.bot.send_photo(chat_id, photo=image, caption=caption)
+    keyboard = [
+        [InlineKeyboardButton('Назад', callback_data='Назад')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.send_photo(
+        chat_id,
+        photo=image,
+        caption=caption,
+        reply_markup=reply_markup
+    )
     context.bot.delete_message(chat_id, message_id=query.message.message_id)
 
-    return "START"
+    return "HANDLE_DESCRIPTION"
+
+
+def handle_description(update, context):
+    if update.callback_query:
+        chat_id = update.callback_query.message.chat_id
+        user_reply = update.callback_query.data
+    elif update.message:
+        chat_id = update.message.chat_id
+        user_reply = update.message.text
+    else:
+        return "START"
+
+    if user_reply == 'Назад':
+        products = fetch_products()['data']
+        keyboard = [
+            [InlineKeyboardButton(
+                product['attributes']['Title'],
+                callback_data=product['id'])]
+            for product in products
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        context.bot.send_message(
+            chat_id,
+            text='Меню:',
+            reply_markup=reply_markup
+        )
+        return "HANDLE_MENU"
+    else:
+        return "START"
 
 
 def handle_users_reply(update, context):
@@ -72,6 +110,7 @@ def handle_users_reply(update, context):
         'START': start,
         'ECHO': echo,
         'HANDLE_MENU': handle_menu,
+        'HANDLE_DESCRIPTION': handle_description,
     }
     state_handler = states_functions[user_state]
     try:
