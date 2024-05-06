@@ -9,7 +9,7 @@ from telegram.ext import Filters, Updater
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 
 from strapi_fetcher import fetch_products, get_product_by_id, \
-    create_or_update_cart, get_cart_by_id
+    create_or_update_cart, get_cart_by_id, delete_cart_product
 
 _database = None
 
@@ -33,15 +33,6 @@ def start(update, context):
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text(text='Привет!', reply_markup=reply_markup)
     return "HANDLE_MENU"
-
-
-def echo(update, context):
-    if update.message:
-        user_reply = update.message.text
-        update.message.reply_text(user_reply)
-    else:
-        pass
-    return "ECHO"
 
 
 def handle_menu(update, context):
@@ -94,10 +85,10 @@ def handle_description(update, context):
         )
         return "HANDLE_MENU"
     elif 'Добавить в корзину' in user_reply:
+        print(1)
         product_id = user_reply.split(':')[1]
         quantity = 1
-        resp = create_or_update_cart(chat_id, {product_id: quantity})
-        pprint.pprint(resp)
+        create_or_update_cart(chat_id, {product_id: quantity})
         context.bot.send_message(
             chat_id,
             text='Добавлено!',
@@ -105,6 +96,35 @@ def handle_description(update, context):
         return "HANDLE_MENU"
     else:
         return "START"
+
+
+def handle_cart(update, context):
+    if update.callback_query:
+        chat_id = update.callback_query.message.chat_id
+    else:
+        chat_id = update.message.chat_id
+    products = get_cart_by_id(chat_id)
+    if not products:
+        message = 'Ваша корзина пуста'
+    else:
+        message = '\n'.join([f'{product} - {info[1]} kg' for product, info in
+                             products.items()])
+
+    keyboard = [
+        [InlineKeyboardButton(
+            f'Удалить {title}',
+            callback_data=f'Удалить:{info[0]}')]
+        for title, info in products.items()
+    ]
+    keyboard.append(
+        [InlineKeyboardButton('В меню', callback_data='В меню')])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.send_message(
+        chat_id,
+        text=message,
+        reply_markup=reply_markup
+    )
+    return "HANDLE_MENU"
 
 
 def handle_users_reply(update, context):
@@ -119,22 +139,39 @@ def handle_users_reply(update, context):
         return
     if user_reply == '/start':
         user_state = 'START'
+    elif user_reply == 'Моя корзина':
+        user_state = 'HANDLE_CART'
+    elif user_reply == 'В меню':
+        products = fetch_products()['data']
+        keyboard = [
+            [InlineKeyboardButton(
+                product['attributes']['Title'],
+                callback_data=product['id'])]
+            for product in products
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        context.bot.send_message(
+            chat_id,
+            text='Меню:',
+            reply_markup=reply_markup
+        )
+        return "HANDLE_MENU"
+    elif 'Удалить' in user_reply.title():
+        cart_product_id = user_reply.split(':')[1]
+        delete_cart_product(cart_product_id)
+        context.bot.send_message(
+            chat_id,
+            text='Продукт успешно удален!'
+        )
+        user_state = 'HANDLE_MENU'
     else:
         user_state = db.get(chat_id).decode("utf-8")
 
-    if user_reply == 'Моя корзина':
-        products = get_cart_by_id(chat_id)
-        message = '\n'.join([f'{product} - {quantity} kg' for product, quantity in products.items()])
-        context.bot.send_message(
-            chat_id,
-            text=message,
-        )
-
     states_functions = {
         'START': start,
-        'ECHO': echo,
         'HANDLE_MENU': handle_menu,
         'HANDLE_DESCRIPTION': handle_description,
+        'HANDLE_CART': handle_cart,
     }
     state_handler = states_functions[user_state]
     try:

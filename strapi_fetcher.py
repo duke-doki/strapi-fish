@@ -46,8 +46,11 @@ def download_image(url, pic_id):
 
 def create_or_update_cart(chat_id, products: dict):
     url = 'http://localhost:1337/api/carts'
-    response_cart = get_cart_by_id(chat_id)
-    pprint.pprint(response_cart)
+    params = {'filters[chat_id][$eq]': chat_id, 'populate': '*'}
+    response = requests.get(url, headers=headers, params=params)
+    response.raise_for_status()
+    response_cart = response.json()
+
     headers['Content-Type'] = 'application/json'
     product_carts_ids = []
     for product_id, product_quantity in products.items():
@@ -59,7 +62,9 @@ def create_or_update_cart(chat_id, products: dict):
             product_cart_id for product_cart_id in product_carts_ids
         ]
     }
+
     if not response_cart['data']:
+
         data = {
             'data': {
                 'chat_id': str(chat_id),
@@ -72,6 +77,7 @@ def create_or_update_cart(chat_id, products: dict):
             data=json.dumps(data)
         )
     else:
+
         cart_id = response_cart['data'][0]['id']
         data = {
             'data': {
@@ -123,13 +129,13 @@ def get_cart_by_id(chat_id):
         ]
         ids_with_quantity = dict(zip(cart_products_ids, cart_products_quantity))
     else:
-        return
+        return None
 
     products = {}
     for product_id, quantity in ids_with_quantity.items():
         cart_product = get_cart_product_by_id(product_id)
         product_title = cart_product['data']['attributes']['product']['data']['attributes']['Title']
-        products[product_title] = quantity
+        products[product_title] = [product_id, quantity]
 
     return products
 
@@ -144,5 +150,14 @@ def get_cart_product_by_id(cart_product_id):
     return cart_product
 
 
+def delete_cart_product(cart_product_id):
+    url = f'http://localhost:1337/api/cart-products/{cart_product_id}'
+    response = requests.delete(url, headers=headers)
+    response.raise_for_status()
+
+    cart_product = response.json()
+    return cart_product
+
+
 if __name__ == '__main__':
-    pprint.pprint(get_cart_by_id(421320156))
+    pprint.pprint(delete_cart_product(26))
