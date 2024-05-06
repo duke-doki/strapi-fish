@@ -112,7 +112,7 @@ def create_product_cart(product_id, quantity=1):
     return response.json()
 
 
-def get_cart_by_id(chat_id):
+def get_cart_products_by_id(chat_id):
     url = 'http://localhost:1337/api/carts'
     params = {'filters[chat_id][$eq]': chat_id, 'populate': '*'}
     response = requests.get(url, headers=headers, params=params)
@@ -159,5 +159,44 @@ def delete_cart_product(cart_product_id):
     return cart_product
 
 
+def add_email_to_cart(chat_id, email):
+    url = 'http://localhost:1337/api/carts'
+    params = {'filters[chat_id][$eq]': chat_id, 'populate': '*'}
+    response = requests.get(url, headers=headers, params=params)
+    response.raise_for_status()
+    response_cart = response.json()
+
+    cart_id = response_cart['data'][0]['id']
+    headers['Content-Type'] = 'application/json'
+    data = {
+        'data': {
+            'email': email
+        }
+    }
+    url = f'{url}/{cart_id}'
+    response = requests.put(
+        url,
+        headers=headers,
+        data=json.dumps(data)
+    )
+    email_response = response.json()
+    if 'error' in email_response:
+        return None
+    else:
+        return email_response
+
+
+def get_email_by_id(chat_id):
+    url = 'http://localhost:1337/api/carts'
+    params = {'filters[chat_id][$eq]': chat_id, 'populate': '*'}
+    response = requests.get(url, headers=headers, params=params)
+    response.raise_for_status()
+
+    cart = response.json()
+    email = cart['data'][0]['attributes']['email']
+
+    return email
+
+
 if __name__ == '__main__':
-    pprint.pprint(delete_cart_product(26))
+    pprint.pprint(add_email_to_cart(421320156, 'joka'))

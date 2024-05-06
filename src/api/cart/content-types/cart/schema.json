@@ -26,6 +26,9 @@
       "relation": "oneToOne",
       "target": "plugin::users-permissions.user",
       "inversedBy": "cart"
+    },
+    "email": {
+      "type": "email"
     }
   }
 }
