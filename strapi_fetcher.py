@@ -1,9 +1,9 @@
 import json
-import pprint
+
+from io import BytesIO
 
 import requests
 from environs import Env
-from io import BytesIO
 
 env = Env()
 env.read_env()
@@ -196,7 +196,3 @@ def get_email_by_id(chat_id):
     email = cart['data'][0]['attributes']['email']
 
     return email
-
-
-if __name__ == '__main__':
-    pprint.pprint(add_email_to_cart(421320156, 'joka'))

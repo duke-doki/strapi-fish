@@ -5,6 +5,7 @@ from environs import Env
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CallbackQueryHandler, MessageHandler, \
     CommandHandler, Filters
+
 from strapi_fetcher import fetch_products, get_product_by_id, \
     create_or_update_cart, get_cart_products_by_id, delete_cart_product, \
     add_email_to_cart, get_email_by_id
