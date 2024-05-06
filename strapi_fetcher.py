@@ -1,18 +1,18 @@
+import json
 import pprint
 
 import requests
 from environs import Env
 from io import BytesIO
 
-
 env = Env()
 env.read_env()
 starapi_token = env.str('API_TOKEN')
+headers = {'Authorization': f'bearer {starapi_token}'}
 
 
 def fetch_products():
     url = 'http://localhost:1337/api/products'
-    headers = {'Authorization': f'bearer {starapi_token}'}
 
     response = requests.get(url, headers=headers)
     response.raise_for_status()
@@ -23,21 +23,20 @@ def fetch_products():
 
 def get_product_by_id(product_id):
     url = f'http://localhost:1337/api/products/{product_id}'
-    headers = {'Authorization': f'bearer {starapi_token}'}
     params = {'populate': 'Picture'}
 
     response = requests.get(url, headers=headers, params=params)
     response.raise_for_status()
 
     product = response.json()
-    image_url = product['data']['attributes']['Picture']['data'][0]['attributes']['url']
+    image_url = \
+    product['data']['attributes']['Picture']['data'][0]['attributes']['url']
     image_url = f'http://localhost:1337{image_url}'
     image = download_image(image_url, product_id)
     return product, image
 
 
 def download_image(url, pic_id):
-    headers = {'Authorization': f'bearer {starapi_token}'}
     response = requests.get(url, headers=headers)
     response.raise_for_status()
 
@@ -45,5 +44,105 @@ def download_image(url, pic_id):
     return image_data
 
 
+def create_or_update_cart(chat_id, products: dict):
+    url = 'http://localhost:1337/api/carts'
+    response_cart = get_cart_by_id(chat_id)
+    pprint.pprint(response_cart)
+    headers['Content-Type'] = 'application/json'
+    product_carts_ids = []
+    for product_id, product_quantity in products.items():
+        product_cart = create_product_cart(product_id, product_quantity)
+        product_cart_id = product_cart['data']['id']
+        product_carts_ids.append(product_cart_id)
+    cart_products = {
+        'connect': [
+            product_cart_id for product_cart_id in product_carts_ids
+        ]
+    }
+    if not response_cart['data']:
+        data = {
+            'data': {
+                'chat_id': str(chat_id),
+                'cart_products': cart_products
+            }
+        }
+        response = requests.post(
+            url,
+            headers=headers,
+            data=json.dumps(data)
+        )
+    else:
+        cart_id = response_cart['data'][0]['id']
+        data = {
+            'data': {
+                'cart_products': cart_products
+            }
+        }
+        url = f'{url}/{cart_id}'
+        response = requests.put(
+            url,
+            headers=headers,
+            data=json.dumps(data)
+        )
+
+    return response.json()
+
+
+def create_product_cart(product_id, quantity=1):
+    url = 'http://localhost:1337/api/cart-products'
+    headers['Content-Type'] = 'application/json'
+    data = {
+        'data': {
+            'product': product_id,
+            'quantity': quantity
+        }
+    }
+    response = requests.post(
+        url,
+        headers=headers,
+        data=json.dumps(data)
+    )
+
+    return response.json()
+
+
+def get_cart_by_id(chat_id):
+    url = 'http://localhost:1337/api/carts'
+    params = {'filters[chat_id][$eq]': chat_id, 'populate': '*'}
+    response = requests.get(url, headers=headers, params=params)
+    response.raise_for_status()
+
+    cart = response.json()
+    if cart['data']:
+        cart_products_ids = [
+            cart['id'] for cart in cart['data'][0]['attributes']['cart_products']['data']
+        ]
+        cart_products_quantity = [
+            cart['attributes']['quantity'] for cart in
+            cart['data'][0]['attributes']['cart_products']['data']
+        ]
+        ids_with_quantity = dict(zip(cart_products_ids, cart_products_quantity))
+    else:
+        return
+
+    products = {}
+    for product_id, quantity in ids_with_quantity.items():
+        cart_product = get_cart_product_by_id(product_id)
+        product_title = cart_product['data']['attributes']['product']['data']['attributes']['Title']
+        products[product_title] = quantity
+
+    return products
+
+
+def get_cart_product_by_id(cart_product_id):
+    url = f'http://localhost:1337/api/cart-products/{cart_product_id}'
+    params = {'populate': '*'}
+    response = requests.get(url, headers=headers, params=params)
+    response.raise_for_status()
+
+    cart_product = response.json()
+    return cart_product
+
+
 if __name__ == '__main__':
-    pprint.pprint(get_product_by_id(2))
+    pprint.pprint(get_cart_by_id(421320156))

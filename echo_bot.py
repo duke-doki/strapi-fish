@@ -1,3 +1,5 @@
+import pprint
+
 from environs import Env
 import logging
 import redis
@@ -6,7 +8,8 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Filters, Updater
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 
-from strapi_fetcher import fetch_products, get_product_by_id
+from strapi_fetcher import fetch_products, get_product_by_id, \
+    create_or_update_cart, get_cart_by_id
 
 _database = None
 
@@ -26,6 +29,7 @@ def start(update, context):
             callback_data=product['id'])]
         for product in products
     ]
+    keyboard.append([InlineKeyboardButton('Моя корзина', callback_data='Моя корзина')])
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text(text='Привет!', reply_markup=reply_markup)
     return "HANDLE_MENU"
@@ -48,7 +52,9 @@ def handle_menu(update, context):
     product, image = get_product_by_id(product_id)
     caption = product['data']['attributes']['Description']
     keyboard = [
-        [InlineKeyboardButton('Назад', callback_data='Назад')]
+        [InlineKeyboardButton('Назад', callback_data='Назад')],
+        [InlineKeyboardButton('Добавить в корзину', callback_data=f'Добавить в корзину:{product_id}')],
+        [InlineKeyboardButton('Моя корзина', callback_data='Моя корзина')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.send_photo(
@@ -87,6 +93,16 @@ def handle_description(update, context):
             reply_markup=reply_markup
         )
         return "HANDLE_MENU"
+    elif 'Добавить в корзину' in user_reply:
+        product_id = user_reply.split(':')[1]
+        quantity = 1
+        resp = create_or_update_cart(chat_id, {product_id: quantity})
+        pprint.pprint(resp)
+        context.bot.send_message(
+            chat_id,
+            text='Добавлено!',
+        )
+        return "HANDLE_MENU"
     else:
         return "START"
 
@@ -105,6 +121,14 @@ def handle_users_reply(update, context):
         user_state = 'START'
     else:
         user_state = db.get(chat_id).decode("utf-8")
+
+    if user_reply == 'Моя корзина':
+        products = get_cart_by_id(chat_id)
+        message = '\n'.join([f'{product} - {quantity} kg' for product, quantity in products.items()])
+        context.bot.send_message(
+            chat_id,
+            text=message,
+        )
 
     states_functions = {
         'START': start,

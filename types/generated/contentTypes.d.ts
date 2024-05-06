@@ -362,6 +362,79 @@ export interface AdminTransferTokenPermission extends Schema.CollectionType {
   };
 }
 
+export interface ApiCartCart extends Schema.CollectionType {
+  collectionName: 'carts';
+  info: {
+    singularName: 'cart';
+    pluralName: 'carts';
+    displayName: 'Cart';
+    description: '';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    chat_id: Attribute.String;
+    cart_products: Attribute.Relation<
+      'api::cart.cart',
+      'manyToMany',
+      'api::cart-product.cart-product'
+    >;
+    users_permissions_user: Attribute.Relation<
+      'api::cart.cart',
+      'oneToOne',
+      'plugin::users-permissions.user'
+    >;
+    createdAt: Attribute.DateTime;
+    updatedAt: Attribute.DateTime;
+    publishedAt: Attribute.DateTime;
+    createdBy: Attribute.Relation<'api::cart.cart', 'oneToOne', 'admin::user'> &
+      Attribute.Private;
+    updatedBy: Attribute.Relation<'api::cart.cart', 'oneToOne', 'admin::user'> &
+      Attribute.Private;
+  };
+}
+
+export interface ApiCartProductCartProduct extends Schema.CollectionType {
+  collectionName: 'cart_products';
+  info: {
+    singularName: 'cart-product';
+    pluralName: 'cart-products';
+    displayName: 'Cart_Product';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    carts: Attribute.Relation<
+      'api::cart-product.cart-product',
+      'manyToMany',
+      'api::cart.cart'
+    >;
+    product: Attribute.Relation<
+      'api::cart-product.cart-product',
+      'manyToOne',
+      'api::product.product'
+    >;
+    quantity: Attribute.Float;
+    createdAt: Attribute.DateTime;
+    updatedAt: Attribute.DateTime;
+    publishedAt: Attribute.DateTime;
+    createdBy: Attribute.Relation<
+      'api::cart-product.cart-product',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+    updatedBy: Attribute.Relation<
+      'api::cart-product.cart-product',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+  };
+}
+
 export interface ApiProductProduct extends Schema.CollectionType {
   collectionName: 'products';
   info: {
@@ -377,6 +450,11 @@ export interface ApiProductProduct extends Schema.CollectionType {
     Description: Attribute.Text;
     Picture: Attribute.Media;
     Price: Attribute.Decimal;
+    cart_products: Attribute.Relation<
+      'api::product.product',
+      'oneToMany',
+      'api::cart-product.cart-product'
+    >;
     createdAt: Attribute.DateTime;
     updatedAt: Attribute.DateTime;
     publishedAt: Attribute.DateTime;
@@ -757,6 +835,11 @@ export interface PluginUsersPermissionsUser extends Schema.CollectionType {
       'manyToOne',
       'plugin::users-permissions.role'
     >;
+    cart: Attribute.Relation<
+      'plugin::users-permissions.user',
+      'oneToOne',
+      'api::cart.cart'
+    >;
     createdAt: Attribute.DateTime;
     updatedAt: Attribute.DateTime;
     createdBy: Attribute.Relation<
@@ -831,6 +914,8 @@ declare module '@strapi/types' {
       'admin::api-token-permission': AdminApiTokenPermission;
       'admin::transfer-token': AdminTransferToken;
       'admin::transfer-token-permission': AdminTransferTokenPermission;
+      'api::cart.cart': ApiCartCart;
+      'api::cart-product.cart-product': ApiCartProductCartProduct;
       'api::product.product': ApiProductProduct;
       'plugin::upload.file': PluginUploadFile;
       'plugin::upload.folder': PluginUploadFolder;
