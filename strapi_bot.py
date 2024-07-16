@@ -38,7 +38,8 @@ def handle_menu(update, context):
                 [InlineKeyboardButton('Назад', callback_data='Назад')],
                 [InlineKeyboardButton('Добавить в корзину',
                                       callback_data=f'Добавить в корзину:{product_id}')],
-                [InlineKeyboardButton('Моя корзина', callback_data='Моя корзина')]
+                [InlineKeyboardButton('Моя корзина',
+                                      callback_data='Моя корзина')]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             context.bot.send_photo(
@@ -47,7 +48,8 @@ def handle_menu(update, context):
                 caption=caption,
                 reply_markup=reply_markup
             )
-            context.bot.delete_message(chat_id, message_id=query.message.message_id)
+            context.bot.delete_message(chat_id,
+                                       message_id=query.message.message_id)
             return "HANDLE_DESCRIPTION"
 
 
@@ -61,7 +63,48 @@ def handle_description(update, context):
             return "HANDLE_MENU"
         elif 'Добавить в корзину' in user_reply:
             product_id = user_reply.split(':')[1]
-            quantity = 1
+            context.user_data['product_id'] = product_id
+            keyboard = [
+                [InlineKeyboardButton(
+                    num,
+                    callback_data=num)]
+                for num in ['1', '5', '10']
+            ]
+            keyboard.append(
+                [
+                    InlineKeyboardButton('Моя корзина',
+                                         callback_data='Моя корзина'),
+                    InlineKeyboardButton('В меню',
+                                         callback_data='В меню')
+                ],
+            )
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            context.bot.send_message(
+                chat_id,
+                text='Выберите количество рыбы в кг:',
+                reply_markup=reply_markup
+            )
+            return "HANDLE_QUANTITY"
+        elif user_reply == 'Моя корзина':
+            send_cart_setup(context, chat_id)
+            return "HANDLE_CART"
+
+
+def handle_quantity(update, context):
+    if update.callback_query:
+        query = update.callback_query
+        chat_id = query.message.chat_id
+        query.answer()
+        user_reply = query.data
+        if user_reply == 'Моя корзина':
+            send_cart_setup(context, chat_id)
+            return "HANDLE_CART"
+        elif user_reply == 'В меню':
+            send_menu_setup(context, chat_id)
+            return "HANDLE_MENU"
+        elif user_reply.isdigit():
+            quantity = int(user_reply)
+            product_id = context.user_data['product_id']
             create_or_update_cart(chat_id, {product_id: quantity})
             context.bot.send_message(
                 chat_id,
@@ -69,9 +112,6 @@ def handle_description(update, context):
             )
             send_menu_setup(context, chat_id)
             return "HANDLE_MENU"
-        elif user_reply == 'Моя корзина':
-            send_cart_setup(context, chat_id)
-            return "HANDLE_CART"
 
 
 def handle_cart(update, context):
@@ -186,6 +226,7 @@ def handle_users_reply(update, context):
         'START': start,
         'HANDLE_MENU': handle_menu,
         'HANDLE_DESCRIPTION': handle_description,
+        'HANDLE_QUANTITY': handle_quantity,
         'HANDLE_CART': handle_cart,
         'WAITING_EMAIL': waiting_email,
     }
