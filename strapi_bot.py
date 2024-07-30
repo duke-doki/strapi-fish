@@ -6,9 +6,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CallbackQueryHandler, MessageHandler, \
     CommandHandler, Filters
 
-from strapi_fetcher import fetch_products, get_product_by_id, \
-    create_or_update_cart, get_cart_products_by_id, delete_cart_product, \
-    add_email_to_cart, get_email_by_id
+from strapi_fetcher import StrapiFetcher
 
 _database = None
 
@@ -32,7 +30,7 @@ def handle_menu(update, context):
             return "HANDLE_CART"
         else:
             product_id = query.data
-            product, image = get_product_by_id(product_id)
+            product, image = fetcher.get_product_by_id(product_id)
             caption = product['data']['attributes']['Description']
             keyboard = [
                 [InlineKeyboardButton('Назад', callback_data='Назад')],
@@ -105,7 +103,7 @@ def handle_quantity(update, context):
         elif user_reply.isdigit():
             quantity = int(user_reply)
             product_id = context.user_data['product_id']
-            create_or_update_cart(chat_id, {product_id: quantity})
+            fetcher.create_or_update_cart(chat_id, {product_id: quantity})
             context.bot.send_message(
                 chat_id,
                 text='Добавлено!',
@@ -131,7 +129,7 @@ def handle_cart(update, context):
             return "WAITING_EMAIL"
         elif 'Удалить' in user_reply:
             cart_product_id = user_reply.split(':')[1]
-            delete_cart_product(cart_product_id)
+            fetcher.delete_cart_product(cart_product_id)
             context.bot.send_message(
                 chat_id,
                 text='Продукт успешно удален!'
@@ -143,7 +141,7 @@ def handle_cart(update, context):
 def waiting_email(update, context):
     user_reply = update.message.text
     chat_id = update.message.chat_id
-    email_response = add_email_to_cart(chat_id, user_reply)
+    email_response = fetcher.add_email_to_cart(chat_id, user_reply)
     if not email_response:
         context.bot.send_message(
             chat_id,
@@ -151,7 +149,7 @@ def waiting_email(update, context):
         )
         return "WAITING_EMAIL"
     else:
-        email = get_email_by_id(chat_id)
+        email = fetcher.get_email_by_id(chat_id)
         context.bot.send_message(
             chat_id,
             text=f'Почта {email} успешно сохранена'
@@ -161,7 +159,7 @@ def waiting_email(update, context):
 
 
 def send_menu_setup(context, chat_id):
-    products = fetch_products()['data']
+    products = fetcher.fetch_products()['data']
     keyboard = [
         [InlineKeyboardButton(
             product['attributes']['Title'],
@@ -180,7 +178,7 @@ def send_menu_setup(context, chat_id):
 
 
 def send_cart_setup(context, chat_id):
-    products = get_cart_products_by_id(chat_id)
+    products = fetcher.get_cart_products_by_id(chat_id)
     if not products:
         message = 'Ваша корзина пуста'
     else:
@@ -250,12 +248,21 @@ def get_database_connection():
 
 
 if __name__ == '__main__':
+    env = Env()
+    env.read_env()
+
+    starapi_token = env.str('API_TOKEN')
+    host = env.str('HOST', 'localhost')
+    port = env.str('PORT', '1337')
+    headers = {'Authorization': f'bearer {starapi_token}'}
+
+    fetcher = StrapiFetcher(host, port, headers)
+
     logging.basicConfig(
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         level=logging.INFO
     )
-    env = Env()
-    env.read_env()
+
     token = env.str("TG_TOKEN")
     updater = Updater(token)
     dispatcher = updater.dispatcher
