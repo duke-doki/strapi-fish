@@ -13,24 +13,24 @@ _database = None
 logger = logging.getLogger(__name__)
 
 
-def start(update, context):
+def start(update, context, bot_data):
     chat_id = update.message.chat_id
-    send_menu_setup(context, chat_id)
+    send_menu_setup(context, chat_id, bot_data)
     return "HANDLE_MENU"
 
 
-def handle_menu(update, context):
+def handle_menu(update, context, bot_data):
     if update.callback_query:
         query = update.callback_query
         chat_id = query.message.chat_id
         query.answer()
         user_reply = query.data
         if user_reply == 'Моя корзина':
-            send_cart_setup(context, chat_id)
+            send_cart_setup(context, chat_id, bot_data)
             return "HANDLE_CART"
         else:
             product_id = query.data
-            product, image = fetcher.get_product_by_id(product_id)
+            product, image = bot_data.get_product_by_id(product_id)
             caption = product['data']['attributes']['Description']
             keyboard = [
                 [InlineKeyboardButton('Назад', callback_data='Назад')],
@@ -51,13 +51,13 @@ def handle_menu(update, context):
             return "HANDLE_DESCRIPTION"
 
 
-def handle_description(update, context):
+def handle_description(update, context, bot_data):
     if update.callback_query:
         chat_id = update.callback_query.message.chat_id
         user_reply = update.callback_query.data
 
         if user_reply == 'Назад':
-            send_menu_setup(context, chat_id)
+            send_menu_setup(context, chat_id, bot_data)
             return "HANDLE_MENU"
         elif 'Добавить в корзину' in user_reply:
             product_id = user_reply.split(':')[1]
@@ -84,42 +84,42 @@ def handle_description(update, context):
             )
             return "HANDLE_QUANTITY"
         elif user_reply == 'Моя корзина':
-            send_cart_setup(context, chat_id)
+            send_cart_setup(context, chat_id, bot_data)
             return "HANDLE_CART"
 
 
-def handle_quantity(update, context):
+def handle_quantity(update, context, bot_data):
     if update.callback_query:
         query = update.callback_query
         chat_id = query.message.chat_id
         query.answer()
         user_reply = query.data
         if user_reply == 'Моя корзина':
-            send_cart_setup(context, chat_id)
+            send_cart_setup(context, chat_id, bot_data)
             return "HANDLE_CART"
         elif user_reply == 'В меню':
-            send_menu_setup(context, chat_id)
+            send_menu_setup(context, chat_id, bot_data)
             return "HANDLE_MENU"
         elif user_reply.isdigit():
             quantity = int(user_reply)
             product_id = context.user_data['product_id']
-            fetcher.create_or_update_cart(chat_id, {product_id: quantity})
+            bot_data.create_or_update_cart(chat_id, {product_id: quantity})
             context.bot.send_message(
                 chat_id,
                 text='Добавлено!',
             )
-            send_menu_setup(context, chat_id)
+            send_menu_setup(context, chat_id, bot_data)
             return "HANDLE_MENU"
 
 
-def handle_cart(update, context):
+def handle_cart(update, context, bot_data):
     if update.callback_query:
         query = update.callback_query
         chat_id = query.message.chat_id
         query.answer()
         user_reply = query.data
         if user_reply == 'В меню':
-            send_menu_setup(context, chat_id)
+            send_menu_setup(context, chat_id, bot_data)
             return "HANDLE_MENU"
         elif user_reply == 'Оплата':
             context.bot.send_message(
@@ -129,19 +129,19 @@ def handle_cart(update, context):
             return "WAITING_EMAIL"
         elif 'Удалить' in user_reply:
             cart_product_id = user_reply.split(':')[1]
-            fetcher.delete_cart_product(cart_product_id)
+            bot_data.delete_cart_product(cart_product_id)
             context.bot.send_message(
                 chat_id,
                 text='Продукт успешно удален!'
             )
-            send_menu_setup(context, chat_id)
+            send_menu_setup(context, chat_id, bot_data)
             return "HANDLE_MENU"
 
 
-def waiting_email(update, context):
+def waiting_email(update, context, bot_data):
     user_reply = update.message.text
     chat_id = update.message.chat_id
-    email_response = fetcher.add_email_to_cart(chat_id, user_reply)
+    email_response = bot_data.add_email_to_cart(chat_id, user_reply)
     if not email_response:
         context.bot.send_message(
             chat_id,
@@ -149,17 +149,17 @@ def waiting_email(update, context):
         )
         return "WAITING_EMAIL"
     else:
-        email = fetcher.get_email_by_id(chat_id)
+        email = bot_data.get_email_by_id(chat_id)
         context.bot.send_message(
             chat_id,
             text=f'Почта {email} успешно сохранена'
         )
-        send_menu_setup(context, chat_id)
+        send_menu_setup(context, chat_id, bot_data)
         return "HANDLE_MENU"
 
 
-def send_menu_setup(context, chat_id):
-    products = fetcher.fetch_products()['data']
+def send_menu_setup(context, chat_id, bot_data):
+    products = bot_data.fetch_products()['data']
     keyboard = [
         [InlineKeyboardButton(
             product['attributes']['Title'],
@@ -177,8 +177,8 @@ def send_menu_setup(context, chat_id):
     )
 
 
-def send_cart_setup(context, chat_id):
-    products = fetcher.get_cart_products_by_id(chat_id)
+def send_cart_setup(context, chat_id, bot_data):
+    products = bot_data.get_cart_products_by_id(chat_id)
     if not products:
         message = 'Ваша корзина пуста'
     else:
@@ -204,7 +204,7 @@ def send_cart_setup(context, chat_id):
     )
 
 
-def handle_users_reply(update, context):
+def handle_users_reply(update, context, bot_data):
     db = get_database_connection()
     if update.message:
         user_reply = update.message.text
@@ -221,12 +221,12 @@ def handle_users_reply(update, context):
         user_state = db.get(chat_id).decode("utf-8")
 
     states_functions = {
-        'START': start,
-        'HANDLE_MENU': handle_menu,
-        'HANDLE_DESCRIPTION': handle_description,
-        'HANDLE_QUANTITY': handle_quantity,
-        'HANDLE_CART': handle_cart,
-        'WAITING_EMAIL': waiting_email,
+        'START': lambda update, context: start(update, context, bot_data),
+        'HANDLE_MENU': lambda update, context: handle_menu(update, context, bot_data),
+        'HANDLE_DESCRIPTION': lambda update, context: handle_description(update, context, bot_data),
+        'HANDLE_QUANTITY': lambda update, context: handle_quantity(update, context, bot_data),
+        'HANDLE_CART': lambda update, context: handle_cart(update, context, bot_data),
+        'WAITING_EMAIL': lambda update, context: waiting_email(update, context, bot_data),
     }
     state_handler = states_functions[user_state]
     try:
@@ -266,8 +266,34 @@ if __name__ == '__main__':
     token = env.str("TG_TOKEN")
     updater = Updater(token)
     dispatcher = updater.dispatcher
-    dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
-    dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
-    dispatcher.add_handler(CommandHandler('start', handle_users_reply))
+    dispatcher.add_handler(
+        CallbackQueryHandler(
+            lambda update, context: handle_users_reply(
+                update,
+                context,
+                fetcher
+            )
+        )
+    )
+    dispatcher.add_handler(
+        MessageHandler(
+            Filters.text & ~Filters.command,
+            lambda update, context: handle_users_reply(
+                update,
+                context,
+                fetcher
+            )
+        )
+    )
+    dispatcher.add_handler(
+        CommandHandler(
+            'start',
+            lambda update, context: handle_users_reply(
+                update,
+                context,
+                fetcher
+            )
+        )
+    )
     updater.start_polling()
     updater.idle()
